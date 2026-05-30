@@ -1,544 +1,1105 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Venturi Carpet Technology (VCG) — Technical Overview</title>
-<style>
-  html { scroll-behavior: smooth; }
-  body { 
-    font-family: Arial, sans-serif; 
-    background: #f7fbff; 
-    color: #0b2a4a; 
-    padding: 40px; 
-    line-height: 1.6; 
-    counter-reset: chapter; /* общий счётчик глав */
-  }
+  <meta charset="utf-8" />
+  <title>AIS: Air Intake System — Final (timings + priorities)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!--
+    PRIORITIES (saved in-memory for morning):
+    1) Полировка таймингов и гистерезиса
+    2) Уточнить поведение при быстрых свайпах и границах
+    3) Проверить утечки слушателей и профилирование памяти
+    4) Доработать z-index и визуальную иерархию тултипов
+    5) Доступность: keyboard focus, aria, открытие тултипов с клавиатуры
+    6) Производительность: throttle, requestAnimationFrame, оптимизация elementFromPoint
+    7) Финальная полировка UI, тесты и сохранение настроек в localStorage
+  -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\
 
-  .chapter { margin-bottom: 60px; counter-reset: subchapter; }
+\[','\\]
 
-  .chapter h2 {
-    counter-increment: chapter;
-    font-size: 24px;
-    margin-bottom: 15px;
-    color: #109c5d;
-    border-bottom: 2px solid #109c5d;
-    padding-bottom: 6px;
-  }
+']],
+        tags: 'ams'
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 
-  .chapter h2::before {
-    content: "Chapter " counter(chapter) ": ";
-    font-weight: bold;
-    color: #0b2a4a;
-  }
-
-  .subchapter h3::before { 
-    counter-increment: subchapter; 
-    content: counter(chapter) "." counter(subchapter) " "; 
-    font-weight: bold; 
-  }
-
-  .formula, .diagram, .datatable { 
-    margin: 20px 0; 
-    padding: 10px; 
-    background: #eef6ff; 
-    border: 1px dashed #109c5d; 
-    font-family: "Courier New", monospace; 
-  }
-
-  table { 
-    width: 100%; 
-    border-collapse: collapse; 
-    margin: 10px 0; 
-    font-size: 14px; 
-  }
-
-  table th, table td { 
-    border: 1px solid #ccc; 
-    padding: 6px 10px; 
-    text-align: left; 
-  }
-
-  table th { 
-    background: #109c5d; 
-    color: #fff; 
-    font-weight: bold; 
-  }
-
-  table tr:nth-child(even) { background: #f2f9f6; } 
-
-  table caption { 
-    caption-side: top; 
-    text-align: left; 
-    font-weight: bold; 
-    margin-bottom: 8px; 
-    color: #0b2a4a; 
-  }
-
-  /* TOC styles */
-  #toc {
-    background: #e6f2ff;
-    border: 2px solid #109c5d;
-    padding: 20px;
-    margin-bottom: 40px;
-    border-radius: 8px;
-  }
-  #toc h1 {
-    font-size: 20px;
-    margin-bottom: 15px;
-    color: #0b2a4a;
-    text-align: center;
-    font-weight: bold;
-  }
-  #toc ul {
-    list-style-type: none;
-    padding: 0;
-    margin: 0;
-  }
-  #toc li { margin: 8px 0; }
-  #toc a {
-    text-decoration: none;
-    color: #109c5d;
-    font-weight: bold;
-    transition: color 0.3s ease;
-  }
-  #toc a:hover {
-    color: #0b2a4a;
-    text-decoration: underline;
-  }
-</style>
-<!-- MathJax для формул -->
-<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-<script id="MathJax-script" async
-  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
-</script>
+  <style>
+    :root{
+      --bg:#f8fbff; --panel:#ffffff; --accent:#1f4e79; --muted:#6b7b8f;
+      --green:#27ae60; --highlight1:#f5a623; --highlight2:#5dade2; --highlight3:#8e44ad;
+    }
+    html,body{ height:100%; }
+    body{
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background:var(--bg); color:#1f2d3d; margin:0; padding:18px;
+      -webkit-font-smoothing:antialiased; line-height:1.5;
+    }
+    header{ text-align:center; padding:20px 0 8px; }
+    h1{ margin:0; color:var(--accent); font-size:1.8rem; font-weight:600; border-bottom:2px solid #dbe5f1; padding-bottom:0.3rem; }
+    h1 span{ font-weight:400; display:block; font-size:0.9rem; color:#34495e; margin-top:6px; }
+    .intro { max-width:920px; margin:18px auto; padding:16px; background:#eef5fb; border-left:4px solid var(--accent); border-radius:8px; }
+    .wrap{ max-width:1200px; margin:18px auto; display:grid; grid-template-columns: 560px 1fr; gap:18px; align-items:start; }
+    .card{ background:var(--panel); border-radius:10px; padding:12px; box-shadow:0 1px 6px rgba(20,40,60,0.06); border:1px solid #e6eef8; }
+    svg#diagram{ max-height:560px; width:100%; height:auto; display:block; margin:6px auto; }
+    .formula-block{ max-width:420px; margin:12px auto 0; padding:10px 12px; background:#fff; border-left:4px solid var(--accent); text-align:left; opacity:0; transform:translateY(8px); max-height:0; overflow:hidden; transition:opacity 360ms ease, transform 360ms ease, max-height 360ms ease; pointer-events:none; border-radius:6px; }
+    .formula-block.show{ opacity:1; transform:translateY(0); max-height:240px; pointer-events:auto; }
+    .controls .grid{ display:grid; grid-template-columns: 1fr 1fr; gap:8px 12px; align-items:center; }
+    .controls label{ display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--muted); }
+    .controls input[type="number"], .controls input[type="range"], .controls select{ width:100%; padding:6px 8px; border-radius:6px; border:1px solid #d6e3f2; box-sizing:border-box; }
+    .controls .range-row{ grid-column: 1 / -1; display:flex; gap:10px; align-items:center; }
+    .controls .small-val{ min-width:56px; text-align:right; color:var(--muted); font-weight:600; }
+    #calcOutput{ margin-top:12px; padding:10px; background:#eef5fb; border-left:4px solid var(--accent); font-size:14px; color:#0f2433; border-radius:6px; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace; }
+    .controls .actions{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    button.btn{ background:var(--accent); color:#fff; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:600; }
+    button.ghost{ background:#fff; color:var(--accent); border:1px solid #d6e3f2; }
+    circle.zone{ cursor:pointer; transition: stroke-width 120ms ease, stroke 120ms ease; }
+    path.air{ transform-box: fill-box; transform-origin: center bottom; stroke: var(--green); fill:none; --scale:1; transform: scaleY(var(--scale)) translateX(0); transition: transform 600ms ease-in-out; stroke-width:3; stroke-linecap:round; }
+    @keyframes wobble{ 0%{ transform: scaleY(var(--scale)) translateX(0);} 25%{ transform: scaleY(var(--scale)) translateX(2px);} 50%{ transform: scaleY(var(--scale)) translateX(-2px);} 75%{ transform: scaleY(var(--scale)) translateX(2px);} 100%{ transform: scaleY(var(--scale)) translateX(0);} }
+    #chartPexit { width:100% !important; height:360px !important; display:block; margin-top:12px; border-radius:8px; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.01)); box-shadow: 0 1px 6px rgba(20,40,60,0.04); max-height:520px; min-height:260px; }
+    .controls { display:flex; flex-direction:column; }
+    #modelControls label { margin: 0; }
+    #modelControls input { box-sizing: border-box; }
+    #svgTip { position: fixed; pointer-events: none; padding: 10px 12px; min-width: 180px; max-width: 360px; white-space: normal; background: rgba(0,0,0,0.82); color: #fff; border-radius: 8px; font-size: 13px; line-height: 1.3; display: none; z-index: 9999; box-shadow: 0 6px 18px rgba(0,0,0,0.35); transition: opacity 140ms ease, transform 140ms ease; transform: translateY(6px); opacity: 0; }
+    #svgTip.show { display: block; opacity: 1; transform: translateY(0); }
+    #chartTip { position: fixed; pointer-events: none; padding: 10px 12px; min-width: 180px; max-width: 360px; white-space: normal; background: rgba(0,0,0,0.82); color: #fff; border-radius: 8px; font-size: 13px; line-height: 1.3; display: none; z-index: 10000; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+    .chart-controls { display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap; }
+    .chart-controls label { font-size:13px; color:var(--muted); display:flex; gap:6px; align-items:center; }
+    .timing-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-left:6px; }
+    .timing-controls label{ font-size:13px; color:var(--muted); display:flex; gap:6px; align-items:center; }
+    .timing-controls input[type="number"]{ width:84px; }
+    .timing-controls .save{ margin-left:6px; }
+    @media (max-width:900px){ .wrap{ grid-template-columns: 1fr; padding:12px; gap:12px; } .controls .grid{ grid-template-columns: 1fr; } .controls .range-row{ flex-direction:column; align-items:flex-start; } .timing-controls{ flex-direction:column; align-items:flex-start; } }
+    footer{ text-align:center; margin-top:18px; color:var(--muted); font-size:13px; }
+  </style>
 </head>
 <body>
-
-<!-- Title Page -->
-<div class="title-page">
-  <h1>Venturi Carpet Technology (VCG)</h1>
-  <h2>Predictable Root Architecture — Technical Overview</h2>
-  <div class="subtitle">
-    <p><em>Engineering the Microclimate of Roots</em></p>
-    <p><em>Geometry as a Living Instrument</em></p>
-  </div>
-  <div class="info">
-    <p><b>Author:</b> Nick Kuprin</p>
-    <p><b>Contact:</b>                                                                                                                              <a href="mailto:nicknickk555@gmail.com"                                                                                   style="display:inline-block; background:#eef6ff; padding:6px 10px; border-radius:6px; color:#109c5d; font-weight:bold; text-decoration:none;">
-      ✉️ nicknickk555@gmail.com
-    </a>
-  </p>
-    <p><b>Date:</b> March 2026</p>
-    <p><b>Location:</b> Kiev, Ukraine</p>
-  </div>
-</div>
-
-<!-- Preface -->
-<div id="preface">
-  <h1>Preface</h1>
-  <p>
-    This document presents the raw structural framework of Venturi Carpet Technology (VCG). 
-    Each chapter is organized with formulas, tables, and diagram placeholders, 
-    highlighting the systematic approach behind the work. 
-    Further explanations will involve specific numerical data for real plants and cultivation conditions. 
-    The mechanical transmission of such information requires significant time and effort, 
-    underscoring that this is professional work and will benefit from feedback in evaluating the material. 
-    What are your thoughts on how best to approach the next level of detail?
-  </p>
-</div>
-
-<!-- Abstract -->
-<div class="abstract">
-  <h3>Abstract</h3>
-  <p>
-    This technical overview introduces <b>Venturi Carpet Technology (VCG)</b> as a novel approach to root cultivation, transforming random air‑pruning into a predictable and controllable process. By engineering the microclimate of roots through geometric design, VCG establishes a framework where sidewall profiles, hydrothermal spikes, and bevel angles act as instruments of cultivation rather than sources of variability.
-  </p>
-  <p>
-    The document outlines the theoretical basis, key formulas, and structural parameters of VCG, followed by comparative analysis against standard containers. Special emphasis is placed on the <b>predictability of drying probability</b>, the <b>optimization of bevel angles (15°–25°)</b>, and the <b>energy efficiency of root guidance</b>.
-  </p>
-  <p>
-    Ultimately, VCG demonstrates how geometry can serve as a living instrument, enabling growers to achieve consistent outcomes and minimize risk. The executive summary provides a client checklist, ensuring practical applicability and clarity for decision‑makers.
-  </p>
-</div>
-
-<!-- Table of Contents -->
-<nav id="toc">
-  <h1>Table of Contents</h1>
-  <ul>
-    <li><a href="#ch1">Chapter 1: Sidewall Profile</a></li>
-    <li><a href="#ch2">Chapter 2: Active vs Guiding</a></li>
-    <li><a href="#ch3">Chapter 3: Hydrothermal Spike Anatomy</a></li>
-    <li><a href="#ch4">Chapter 4: Thermal Field</a></li>
-    <li><a href="#ch5">Chapter 5: Drying Probability</a></li>
-    <li><a href="#ch6">Chapter 6: Comparative Analysis</a></li>
-    <li><a href="#ch7">Chapter 7: Executive Summary</a></li>
-    <li><a href="#ch8">Chapter 8: Bevel Angle Analysis</a></li>
-    <li><a href="#ch9">Chapter 9: Surface Area vs Guide Angle</a></li>
-    <li><a href="#ch10">Chapter 10: Conclusion</a></li>
-  </ul>
-</nav><!-- Chapter 1 -->
-<div class="chapter" id="ch1">
-  <h2>Sidewall Profile</h2>
-  <p>Analysis of the container sidewall geometry and Venturi zone.</p>
-  <div class="formula">
-    
-
-\[ A_{side} = 2 \pi r h \]
-
-
-  </div>
-  <div class="diagram">[Diagram: Venturi zone and sidewall curvature]</div>
-  <div class="datatable">
-    <table>
-      <caption>Geometric Parameters of Sidewall</caption>
-      <thead>
-        <tr><th>Parameter</th><th>Value</th><th>Unit</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Radius (r)</td><td>10</td><td>cm</td></tr>
-        <tr><td>Height (h)</td><td>25</td><td>cm</td></tr>
-        <tr><td>Venturi angle</td><td>20</td><td>degrees</td></tr>
-        <tr><td>Sidewall thickness</td><td>0.5</td><td>cm</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Chapter 2 -->
-<div class="chapter" id="ch2">
-  <h2>Active vs Guiding</h2>
-  <p>Comparison of active and guiding sidewall profiles.</p>
-  <div class="formula">
-    
-
-\[ E = \frac{F_{active}}{F_{guiding}} \]
-
-
-  </div>
-  <div class="diagram">[Diagram: Active vs Guiding profile airflow]</div>
-  <div class="datatable">
-    <table>
-      <caption>Comparison of Active vs Guiding Profiles</caption>
-      <thead>
-        <tr><th>Criterion</th><th>Active Profile</th><th>Guiding Profile</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Airflow intensity</td><td>High, turbulent</td><td>Moderate, directed</td></tr>
-        <tr><td>Root guidance</td><td>Less predictable</td><td>Highly predictable</td></tr>
-        <tr><td>Drying speed</td><td>Fast but uneven</td><td>Balanced and controlled</td></tr>
-        <tr><td>Energy efficiency</td><td>Lower due to turbulence</td><td>Higher due to guided flow</td></tr>
-        <tr><td>Risk of apex misgrowth</td><td>Elevated</td><td>Minimal</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-<!-- Chapter 3 -->
-<div class="chapter" id="ch3">
-  <h2>Hydrothermal Spike Anatomy</h2>
-  <p>Structural and functional analysis of the hydrothermal spike.</p>
-  <div class="formula">
-    
-
-\[ Q_{spike} = h \cdot A_{spike} \cdot (T_{spike} - T_{ambient}) \]
-
-
-  </div>
-  <div class="diagram">[Diagram: Hydrothermal spike anatomy and zones]</div>
-  <div class="datatable">
-    <table>
-      <caption>Hydrothermal Spike Parameters</caption>
-      <thead>
-        <tr><th>Parameter</th><th>Value</th><th>Unit</th></tr>
-      </thead>
-      <tbody>  
-        <tr><td>Spike length</td><td>12</td><td>cm</td></tr>
-        <tr><td>Spike diameter</td><td>2.5</td><td>cm</td></tr>
-        <tr><td>Surface area (A_spike)</td><td>94</td><td>cm²</td></tr>
-        <tr><td>Temperature at tip (T_spike)</td><td>28</td><td>°C</td></tr>
-        <tr><td>Ambient temperature (T_ambient)</td><td>22</td><td>°C</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Chapter 4 -->
-<div class="chapter" id="ch4">
-  <h2>Thermal Field</h2>
-  <p>Temperature distribution across the container zones.</p>
-  <div class="formula">
-    
-
-\[ q = -k \cdot \nabla T \cdot V \]
-
-
-  </div>
-  <div class="diagram">[Graph: Temperature distribution across sidewall and spike zones]</div>
-  <div class="datatable">
-    <table>
-      <caption>Temperature Distribution by Zone</caption>
-      <thead>
-        <tr><th>Zone</th><th>Position</th><th>Temperature (°C)</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Base</td><td>Lower sidewall</td><td>22</td></tr>
-        <tr><td>Mid</td><td>Venturi zone</td><td>25</td></tr>
-        <tr><td>Spike</td><td>Hydrothermal apex</td><td>28</td></tr>
-        <tr><td>Outer</td><td>External surface</td><td>20</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Chapter 5 -->
-<div class="chapter" id="ch5">
-  <h2>Drying Probability</h2>
-  <p>Calculation of drying time and apex emergence probability.</p>
-  <div class="formula">
-    
-
-\[ P_{apex} = 1 - e^{-\lambda \cdot t} \]
-
-
-  </div>
-  <div class="diagram">[Graph: Apex emergence probability vs Drying time]</div>
-  <div class="datatable">
-    <table>
-      <caption>Calculated Drying Probability Values</caption>
-      <thead>
-        <tr><th>Time (hours)</th><th>Drying Rate Constant (λ)</th><th>Probability (P)</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>4</td><td>0.05</td><td>0.18</td></tr>
-        <tr><td>8</td><td>0.05</td><td>0.33</td></tr>
-        <tr><td>12</td><td>0.05</td><td>0.45</td></tr>
-        <tr><td>16</td><td>0.05</td><td>0.55</td></tr>
-        <tr><td>24</td><td>0.05</td><td>0.70</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-<!-- Chapter 6 -->
-<div class="chapter" id="ch6">
-  <h2>Comparative Analysis</h2>
-  <p>Comparison of Air‑Pot® 7 with a standard container.</p>
-  <div class="formula">
-    
-
-\[ \eta = \frac{Q_{VCG}}{Q_{Standard}} \]
-
-
-  </div>
-  <div class="diagram">[Diagram: Root growth patterns Air‑Pot® 7 vs Standard]</div>
-  <div class="datatable">
-    <table>
-      <caption>Comparative Parameters: Air‑Pot® 7 vs Standard Container</caption>
-      <thead>
-        <tr><th>Criterion</th><th>Air‑Pot® 7 with VCG</th><th>Standard Container</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Air‑pruning predictability</td><td>High, controlled</td><td>Random, uncontrolled</td></tr>
-        <tr><td>Drying speed</td><td>Optimized (15°–25° bevel)</td><td>Variable, uncontrolled</td></tr>
-        <tr><td>Energy efficiency</td><td>Balanced, reduced thermal loss</td><td>Low, inefficient</td></tr>
-        <tr><td>Root architecture</td><td>Predictable, guided apex emergence</td><td>Chaotic, uneven growth</td></tr>
-        <tr><td>Client risk</td><td>Minimal</td><td>High</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Chapter 7 -->
-<div class="chapter" id="ch7">
-  <h2>Executive Summary</h2>
-  <p>VCG Client Checklist.</p>
-  <div class="formula">
-    
-
-\[ \Phi = \sum (Predictability + Efficiency - Risk) \]
-
-
-  </div>
-  <div class="diagram">[Diagram: Executive summary flowchart]</div>
-  <div class="datatable">
-    <table>
-      <caption>VCG Client Checklist</caption>
-      <thead>
-        <tr><th>Criterion</th><th>Air‑Pot® 7 with VCG</th><th>Standard Container</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Predictability of air‑pruning</td><td>High</td><td>Random</td></tr>
-        <tr><td>Drying speed</td><td>Optimized (15°–25°)</td><td>Uncontrolled</td></tr>
-        <tr><td>Energy efficiency</td><td>Balanced</td><td>Low</td></tr>
-        <tr><td>Client risk</td><td>Minimal</td><td>High</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-<!-- Chapter 8 -->
-<div class="chapter" id="ch8">
-  <h2>Bevel Angle Analysis</h2>
-  <p>Effect of bevel angle on drying speed and time.</p>
-  <div class="formula">
-    
-
-\[ t_{dry} = \frac{C}{\theta} \]
-
-
-  </div>
-  <div class="diagram">[Graph: Drying time vs Bevel angle]</div>
-  <div class="datatable">
-    <table>
-      <caption>Drying Time at Different Bevel Angles</caption>
-      <thead>
-        <tr><th>Bevel Angle (°)</th><th>Drying Time (hours)</th><th>Drying Efficiency</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>10°</td><td>16</td><td>Low</td></tr>
-        <tr><td>15°</td><td>12</td><td>Optimal</td></tr>
-        <tr><td>20°</td><td>9</td><td>Optimal</td></tr>
-        <tr><td>25°</td><td>8</td><td>Optimal</td></tr>
-        <tr><td>30°</td><td>7</td><td>Declining stability</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Chapter 9 -->
-<div class="chapter" id="ch9">
-  <h2>Surface Area vs Guide Angle</h2>
-  <p>Analysis of the relationship between surface area and guide angle. The optimal range is 15°–25°.</p>
-  <div class="formula">
-    
-
-\[ S(\theta) = \pi r^2 \cdot \cos(\theta) \]
-
-
-  </div>
-  <div class="diagram">[Graph: Surface Area vs Guide Angle]</div>
-  <div class="datatable">
-    <table>
-      <caption>Optimal Guide Angle Range</caption>
-      <thead>
-        <tr><th>Guide Angle (°)</th><th>Surface Area (cm²)</th><th>Drying Efficiency</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>10°</td><td>95</td><td>Low</td></tr>
-        <tr><td>15°</td><td>120</td><td>Optimal</td></tr>
-        <tr><td>20°</td><td>135</td><td>Optimal</td></tr>
-        <tr><td>25°</td><td>150</td><td>Optimal</td></tr>
-        <tr><td>30°</td><td>160</td><td>Declining</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-<!-- Chapter 10 -->
-<div class="chapter" id="ch10">
-  <h2>Conclusion</h2>
-  <p>Summary of key findings and final thesis.</p>
-  <div class="formula">
-    
-
-\[ \Psi = \frac{P_{apex} \cdot E_{dry}}{R_{risk}} \]
-
-
-  </div>
-  <div class="diagram">[Diagram: Integration of geometry, thermal field, and root architecture]</div>
-  <div class="datatable">
-    <table>
-      <caption>Key Thesis Summary</caption>
-      <thead>
-        <tr><th>Aspect</th><th>VCG Contribution</th><th>Outcome</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Geometry</td><td>Venturi sidewall & bevel angles</td><td>Predictable root guidance</td></tr>
-        <tr><td>Thermal field</td><td>Controlled heat distribution</td><td>Optimized drying probability</td></tr>
-        <tr><td>Hydrothermal spike</td><td>Directed apex emergence</td><td>Consistent architecture</td></tr>
-        <tr><td>Comparative analysis</td><td>Air‑Pot® 7 vs standard container</td><td>Reduced risk, higher efficiency</td></tr>
-        <tr><td>Final thesis</td><td>VCG transforms randomness into predictability</td><td>Reliable cultivation instrument</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>  
-
-  <!-- Bridge to Page 13 -->
-  <p style="text-align:center; margin-top:40px; font-size:15px; color:#3e5d79;">
-    To deepen your understanding, continue to <b>Page 13</b> — Quick Field Check & The 50% Rule.
-  </p>
-</div>
-
-<!-- Page 13 -->
-<section class="page" id="p13" style="margin-top:60px;">
-  <header class="masthead">
-    <h1>Page 13: Quick Field Check & The 50% Rule</h1>
-    <p>UNITED ROOT • Venturi Carpet Technology (VCG)</p>
+  <header>
+    <h1>AIS: Air Intake System <span>Engineering Logic in Every Cell</span></h1>
+    <div class="hero-icon" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="48" height="48">
+        <circle cx="24" cy="32" r="16" fill="var(--green)" opacity="0.85"/>
+        <circle cx="40" cy="32" r="16" fill="var(--highlight3)" opacity="0.85"/>
+        <circle cx="32" cy="32" r="16" fill="#6c5ce7" opacity="0.5"/>
+      </svg>
+    </div>
   </header>
 
-  <div class="card">
-    <h2>1. Quick Field Check</h2>
-    <ul>
-      <li><b>Touch test:</b> If the cone wall feels cool/damp beyond mid height, reduce fill next cycle.</li>
-      <li><b>Visual cue:</b> If white, bushy laterals are forming inside the cone volume, you are in the optimal pruning band.</li>
+  <div class="intro card">
+    <h3>Geometry as a Control Element</h3>
+    <p>Each cell at the container bottom is a Venturi-style truncated pyramid. The bottom is divided into three concentric zones, each with a distinct chamfer angle.</p>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <h2 style="margin-top:0;color:#34495e;text-align:center;">Interactive bottom schematic</h2>
+
+      <svg id="diagram" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid meet" aria-label="Venturi zones">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0 0 L10 5 L0 10 Z" fill="var(--green)"/>
+          </marker>
+        </defs>
+
+        <circle id="zone-peripheral" class="zone" cx="150" cy="150" r="90" fill="var(--highlight3)" opacity="0.6" stroke="var(--accent)" stroke-width="1.5"/>
+        <circle id="zone-transition" class="zone" cx="150" cy="150" r="60" fill="var(--highlight2)" opacity="0.85" stroke="var(--accent)" stroke-width="1.5"/>
+        <circle id="zone-central" class="zone" cx="150" cy="150" r="30" fill="var(--highlight1)" opacity="1.0" stroke="var(--accent)" stroke-width="1.5"/>
+
+        <g id="arrowsGroup">
+          <path id="arrow1" class="air" d="M150 240 C150 220 150 190 150 150" marker-end="url(#arrow)"/>
+          <path id="arrow2" class="air" d="M120 250 C120 220 130 190 140 150" marker-end="url(#arrow)"/>
+          <path id="arrow3" class="air" d="M180 250 C180 220 170 190 160 150" marker-end="url(#arrow)"/>
+        </g>
+
+        <text x="150" y="148" text-anchor="middle" font-size="12" fill="#072033" font-weight="600">Center</text>
+        <text x="150" y="188" text-anchor="middle" font-size="12" fill="#072033">Transition</text>
+        <text x="150" y="228" text-anchor="middle" font-size="12" fill="#072033">Periphery</text>
+      </svg>
+
+      <div id="formula-central" class="formula-block">
+        <p><strong>Central zone</strong></p>
+        <p>\(u_{\text{eff}} \approx \dfrac{u_0}{\cos(15^\circ)}\)</p>
+      </div>
+      
+<div id="formula-transition" class="formula-block">
+        <p><strong>Transition zone</strong></p>
+        <p class="small">Moderate speed, moderate drying effect.</p>
+        <p>\(u_{\text{eff}} \approx \dfrac{u_0}{\cos(25^\circ)}\)</p>
+      </div>
+
+      <div id="formula-peripheral" class="formula-block">
+        <p><strong>Peripheral zone</strong></p>
+        <p class="small">Aggressive drying, high local speed.</p>
+        <p>\(u_{\text{eff}} \approx \dfrac{u_0}{\cos(40^\circ)}\)</p>
+      </div>
+    </div>
+    <div class="card controls">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div><strong>Model parameters</strong></div>
+        <div class="small">Units: mm, m/s</div>
+      </div>
+
+      <div class="grid">
+        <div><label>Top hole D1 (mm)<input id="inpD1" type="number" min="4" max="12" value="8"></label></div>
+        <div><label>Cone base Dbase (mm)<input id="inpDbase" type="number" min="10" max="40" value="22"></label></div>
+        <div><label>Internal hole Dint (mm)<input id="inpDint" type="number" min="2" max="12" value="6"></label></div>
+        <div><label>Number of internal holes Nint<input id="inpNint" type="number" min="1" max="200" value="62"></label></div>
+        <div><label>Bottom diameter Dbottom (mm)<input id="inpDbottom" type="number" min="100" max="600" value="310"></label></div>
+        <div><label>Number of outer holes Nout<input id="inpNout" type="number" min="1" max="200" value="62"></label></div>
+
+        <div class="range-row">
+          <label style="flex:1;">V0 (inlet speed)
+            <input id="inpV0" type="range" min="0.05" max="2" step="0.01" value="0.68">
+          </label>
+          <div class="small-val"> <span id="valV0">0.68</span> m/s</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="btnReset" class="btn ghost">Reset</button>
+        <button id="btnExport" class="btn">Export CSV</button>
+        <button id="btnCopy" class="btn ghost">Copy results</button>
+      </div>
+
+      <div id="calcOutput">Loading results...</div>
+
+      <canvas id="chartPexit"></canvas>
+
+      <div class="chart-controls" style="margin-top:8px;">
+        <label>Y format
+          <select id="yFormat">
+            <option value="percent" selected>Percent (%)</option>
+            <option value="fraction">Fraction (0–1)</option>
+          </select>
+        </label>
+
+        <label>Y step
+          <select id="yStep">
+            <option value="0.05">0.05</option>
+            <option value="0.1" selected>0.1</option>
+            <option value="0.2">0.2</option>
+          </select>
+        </label>
+
+        <label>Show V0 line
+          <select id="showV0Line">
+            <option value="true" selected>Yes</option>
+            <option value="false">No</option>
+          </select>
+        </label>
+
+        <label>Line color
+          <input id="v0LineColor" type="color" value="#1f4e79" style="height:34px;padding:2px;">
+        </label>
+
+        <div class="timing-controls" title="Настройки задержек тултипов">
+          <label>Hysteresis
+            <input id="tim_hyst" type="number" min="0" step="10" value="80"> ms
+          </label>
+          <label>Show delay
+            <input id="tim_show" type="number" min="0" step="10" value="50"> ms
+          </label>
+          <label>Hide delay
+            <input id="tim_hide" type="number" min="0" step="5" value="20"> ms
+          </label>
+          <button id="tim_save" class="btn save">Save</button>
+          <button id="tim_reset" class="btn ghost save">Reset</button>
+        </div>
+      </div>
+
+      <div id="modelControls" style="margin-top:10px; display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
+        <label style="font-size:13px;color:var(--muted);">k_a<input id="inp_ka" type="number" step="0.1" value="1.2"></label>
+        <label style="font-size:13px;color:var(--muted);">f_focus<input id="inp_ff" type="number" step="0.1" value="1.0"></label>
+        <label style="font-size:13px;color:var(--muted);">t*<input id="inp_tstar" type="number" step="0.1" value="1.0"></label>
+        <label style="font-size:13px;color:var(--muted);">α<input id="inp_alpha" type="number" step="0.1" value="2.0"></label>
+
+        <label style="font-size:13px;color:var(--muted);">Arrow amplitude<input id="inp_arrow_amp" type="range" min="0" max="2" step="0.01" value="0.80"></label>
+        <label style="font-size:13px;color:var(--muted);">Arrow speed<input id="inp_arrow_freq" type="range" min="0.4" max="2.4" step="0.01" value="1.00"></label>
+        <label style="font-size:13px;color:var(--muted);">Arrow count<input id="inp_arrow_count" type="number" min="1" max="5" step="1" value="3"></label>
+        <div></div>
+      </div>
+
+      <div style="margin-top:10px;font-size:13px;color:var(--muted);">
+        Formulas: \(A=\pi (d/2)^2\). \(Q=N_{out}\cdot A_{D1}\cdot V_0\). \(V_{int}=Q/A_{int,tot}\). \(V_{avg}=Q/A_{bottom}\).
+      </div>
+    </div>
+  </div>
+
+  <div id="svgTip" aria-hidden="true"></div>
+  <div id="chartTip" aria-hidden="true"></div>                                                                                                                                                                                                                                                              <!-- Section 3 -->
+  <section style="max-width:920px;margin:32px auto;">
+    <h2 style="color:#34495e;">🌱 3. Apex Emergence and Pruning Efficiency</h2>
+    <div style="background:#f4f8fb;padding:12px;border-left:4px solid #2ecc71;border-radius:8px;">
+      <div style="margin-bottom:8px;">
+        
+
+\[
+          P_{\text{exit},b} = 1 - \exp(-k_a \cdot \varphi_{\text{cap}})
+        \]
+
+
+      </div>
+      <div style="margin-bottom:8px;">
+        
+
+\[
+          \varphi_{\text{cap}} = \left(\frac{\pi \cdot r_{\text{eff},b}^2}{s_b^2}\right) \cdot f_{\text{focus}}
+        \]
+
+
+      </div>
+      <div>
+        
+
+\[
+          q_b = \frac{1}{1 + \left(\frac{t_{\text{dry},b}}{t^*}\right)^\alpha}
+        \]
+
+
+      </div>
+    </div>
+    <p style="max-width:920px;margin:8px auto 0;">→ With optimal geometry and drying, apices emerge and are pruned in the target zone.</p>
+  </section>
+
+  <!-- Section 4 -->
+  <section style="max-width:920px;margin:32px auto;">
+    <h2 style="color:#34495e;">📊 4. Daily Laterals and Vertical Profile</h2>
+    <div style="background:#f4f8fb;padding:12px;border-left:4px solid #9b59b6;border-radius:8px;">
+      <div style="margin-bottom:8px;">
+        
+
+\[
+          N_{\text{events},b} = J_{\downarrow} \cdot P_{\text{exit},b}, \quad J_{\downarrow} = \frac{N_{\downarrow} \cdot v_z}{H_{\text{col}}}
+        \]
+
+
+      </div>
+      <div style="margin-bottom:8px;">
+        
+
+\[
+          N_{\text{lat},b} = N_{\text{events},b} \cdot b \cdot q_b
+        \]
+
+
+      </div>
+      <div>
+        
+
+\[
+          \rho_{\text{lat},b}(r) \propto P_{\text{exit},b} \cdot q_b \cdot w(r)
+        \]
+
+
+      </div>
+    </div>
+    <p style="max-width:920px;margin:8px auto 0;">→ With chamfer and localized drying, the branching peak shifts downward, creating programmable root architecture.</p>
+  </section>
+
+  <!-- Summary -->
+  <section style="max-width:920px;margin:32px auto;border-top:2px solid #dbe5f1;padding-top:24px;">
+    <h2 style="color:#1f4e79;">🎯 AIS is not just a bottom. It is:</h2>
+    <ul style="list-style:square;padding-left:20px;">
+      <li>An air bag beneath the container</li>
+      <li>A Venturi chamfer in every cell</li>
+      <li>Engineering logic embedded in geometry</li>
+      <li>A system for drying and pruning control</li>
+      <li>A programmable architecture for roots</li>
     </ul>
-  </div>
+  </section>
 
-  <div class="card">
-    <h2>2. How to Fill the Cone — The 50% Rule</h2>
-    <p><b>Air, Angle, Root — One System.</b>  
-       The cone guides roots toward the air hole and triggers natural pruning.  
-       How you fill it with compost determines where and how pruning happens.</p>
-    <ul>
-      <li><b>Geometry effect:</b> Flatter bevel increases fill shelf → raises ℓ<sub>f</sub>, porous thickness, and R<sub>p</sub>.</li>
-      <li><b>Venturi acceleration:</b> Narrowing accelerates airflow → increases k<sub>g</sub>, D<sub>a</sub><sup>eff</sup> ∝ u<sub>eff</sub>, via Sherwood number:  
-        <div class="eq">Sh ∼ a · Re^m · Sc^(1/3), &nbsp; u<sub>eff</sub> ≈ u₀ / cosθ</div></li>
-      <li><b>Net effect:</b>
-        <ul>
-          <li>Horizontal segments ease filling but increase R<sub>p</sub>.</li>
-          <li>Venturi acceleration reduces R<sub>a</sub>, R<sub>h</sub>.</li>
-          <li>Balance determines pruning location s*:
-            <ul>
-              <li>If R<sub>p</sub> dominates → pruning shifts outward (later, softer).</li>
-              <li>If R<sub>a</sub>, R<sub>h</sub> reduced strongly → pruning shifts inward (earlier, sharper).</li>
-            </ul>
-          </li>
-        </ul>
-      </li>
-    </ul>
-    <p>✨ The new bevel is not just a usability feature — it is a regulator of pruning dynamics.</p>
-  </div>
-
-  <div class="card">
-    <h2>3. Key Equations</h2>
-    <div class="eq">A<sub>fill</sub> ∝ tan(θ)</div>
-    <div class="eq">R<sub>p</sub> ∝ 1 / A<sub>fill</sub></div>
-    <div class="eq">s* = (RH(0) − RH*) · D · A / J</div>
-  </div>
-
-  <div class="card params">
-    <h2>Parameters</h2>
-    <table>
-      <thead><tr><th>Symbol</th><th>Description</th><th>Value</th></tr></thead>
-      <tbody>
-        <tr><td>θ</td><td>Bevel angle</td><td>20°</td></tr>
-        <tr><td>RH(0)</td><td>Soil-side relative humidity</td><td>100%</td></tr>
-        <tr><td>RH*</td><td>Pruning threshold</td><td>70%</td></tr>
-        <tr><td>D</td><td>Diffusivity in air</td><td>2.5×10⁻⁵ m²/s</td></tr>
-        <tr><td>A</td><td>Hole area</td><td>5.03×10⁻⁵ m²</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Invitation to Interactive Slide -->
-  <div style="text-align:center; margin-top:30px;">
-    <a href="https://https:nicknickk555.github.io/cataloggeorgie/"
-       style="background:#109c5d; color:#fff; padding:12px 28px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:16px; box-shadow:0 3px 8px rgba(0,0,0,0.2);">
-       🌿 See the 50% Rule in Action
-    </a>
-    <p style="margin-top:12px; font-size:14px; color:#3e5d79;">
-      Explore the interactive demo and watch how <b>geometry and airflow</b> reshape pruning dynamics.  
-      Adjust fill levels (50%, 75%, 100%) and experience the difference live.
+  <!-- Closing epigraph -->
+  <section style="text-align:center;margin:48px 0 24px 0;">
+    <hr style="border:none;border-top:2px solid #dbe5f1;width:60%;margin:24px auto;">
+    <p style="font-size:1.1em;color:#1f4e79;font-style:italic;">
+      AIS — where geometry breathes, and roots respond.
     </p>
-  </div>
+    <p style="font-size:0.95em;color:#34495e;">
+      Engineered for climate. Designed for life.
+    </p>
+  </section>
 
-  <footer class="footer">📌 UNITED ROOT — Venturi Carpet Technology. Page 13.</footer>
-</section>
+  <footer>Tip: click a zone in the SVG to change arrow intensity and show the matching formula.</footer>
 
 
+<script>
+/* Integrated fixes:
+   - Hysteresis + show/hide delays with owner-aware state machine
+   - requestAnimationFrame positioning for tooltips
+   - throttled elementFromPoint
+   - Chart.js: numeric linear x-axis, dataset as {x,y}, V0 sync and auto-expand axis
+   - Arrow amplitude affects arrow scale
+   - Timings UI persisted in localStorage under 'ais_tooltip_timings_v1'
+*/
+
+/* LocalStorage key */
+const LS_KEY = 'ais_tooltip_timings_v1';
+
+/* Load timings */
+function loadTimings(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return { hysteresis:80, show:50, hide:20 };
+    const parsed = JSON.parse(raw);
+    return {
+      hysteresis: Number(parsed.hysteresis) || 80,
+      show: Number(parsed.show) || 50,
+      hide: Number(parsed.hide) || 20
+    };
+  }catch(e){
+    return { hysteresis:80, show:50, hide:20 };
+  }
+}
+function saveTimings(t){ try{ localStorage.setItem(LS_KEY, JSON.stringify(t)); }catch(e){} }
+let TIMINGS = loadTimings();
+
+/* Apply timings to UI */
+function applyTimingsToUI(){
+  const h = document.getElementById('tim_hyst');
+  const s = document.getElementById('tim_show');
+  const hd = document.getElementById('tim_hide');
+  if(h) h.value = TIMINGS.hysteresis;
+  if(s) s.value = TIMINGS.show;
+  if(hd) hd.value = TIMINGS.hide;
+}
+applyTimingsToUI();
+
+/* Update timings from UI */
+function updateTimingsFromUI(){
+  const h = parseInt(document.getElementById('tim_hyst')?.value,10) || 80;
+  const s = parseInt(document.getElementById('tim_show')?.value,10) || 50;
+  const hd = parseInt(document.getElementById('tim_hide')?.value,10) || 20;
+  TIMINGS = { hysteresis: Math.max(0,h), show: Math.max(0,s), hide: Math.max(0,hd) };
+  saveTimings(TIMINGS);
+}
+
+/* getters */
+function getHysteresis(){ return TIMINGS.hysteresis; }
+function getShowDelay(){ return TIMINGS.show; }
+function getHideDelay(){ return TIMINGS.hide; }
+
+/* Utilities */
+function mmToM(mm){ return mm/1000; }
+function areaFromMm(d_mm){ const r = mmToM(d_mm)/2; return Math.PI*r*r; }
+function safeDiv(a,b,fallback=0){ return Math.abs(b)>1e-12 ? a/b : fallback; }
+function nowISO(){ return (new Date()).toISOString(); }
+
+/* Calculations */
+const defaults = { V0:0.68, D1:8, Dbase:22, Nout:62, Nint:62, Dint:6, Dbottom:310, ka:1.2, f_focus:1.0, t_star:1.0, alpha:2.0, b_coeff:0.5 };
+const params = Object.assign({}, defaults);
+
+function calcFlows(p){
+  const A1 = areaFromMm(p.D1);
+  const Abase = areaFromMm(p.Dbase);
+  const Aint_single = areaFromMm(p.Dint);
+  const Aint_tot = Math.max(p.Nint * Aint_single, 1e-12);
+  const Abottom = Math.max(areaFromMm(p.Dbottom), 1e-12);
+  const Q = p.Nout * A1 * p.V0;
+  const V_int = safeDiv(Q, Aint_tot, 0);
+  const V_avg_bottom = safeDiv(Q, Abottom, 0);
+  return { A1, Abase, Q, Aint_single, Aint_tot, V_int, Abottom, V_avg_bottom, meta:{params:Object.assign({},p),ts:nowISO()} };
+}
+
+function computePruningMetrics(flow, geom, model = {}){
+  const m = Object.assign({ ka: defaults.ka, f_focus: defaults.f_focus, t_star: defaults.t_star, alpha: defaults.alpha, b_coeff: defaults.b_coeff }, model);
+  const r_eff_b = (geom && geom.r_eff_b) || 0.005;
+  const s_b = (geom && geom.s_b) || 0.02;
+  const t_dry_b = (geom && geom.t_dry_b) || 1.0;
+  const phi_cap = (Math.PI * r_eff_b * r_eff_b / (s_b * s_b)) * m.f_focus;
+  const P_exit_b = 1 - Math.exp(-m.ka * phi_cap);
+  const Phi = 1 / (1 + Math.pow((t_dry_b / m.t_star), m.alpha));
+  return { phi_cap, P_exit_b, Phi, q_b:Phi, model:m };
+}
+
+/* Visual mapping */
+function mapVavgToVisual(Vavg, Vref = 0.5){
+  const norm = Vavg / Math.max(1e-6, Vref);
+  const arrowScale = Math.min(2.6, Math.max(0.4, 0.6 + 1.4 * Math.sqrt(norm)));
+  const wobbleAmp = Math.min(2.4, 0.2 + 1.2 * Math.min(2, norm));
+  const wobbleFreq = 0.6 + 0.8 * Math.min(2, norm);
+  return { arrowScale, wobbleAmp, wobbleFreq };
+}
+
+function updateArrowsVisual(vis){
+  const arrowsGroup = document.getElementById('arrowsGroup');
+  if(!arrowsGroup) return;
+  const desired = Math.max(1, Math.min(5, parseInt(vis.count || 3,10)));
+  let existing = Array.from(arrowsGroup.querySelectorAll('.air'));
+  while(existing.length < desired){
+    const clone = existing[existing.length - 1].cloneNode(true);
+    clone.id = 'arrow' + (existing.length + 1);
+    arrowsGroup.appendChild(clone);
+    existing = Array.from(arrowsGroup.querySelectorAll('.air'));
+  }
+  existing.forEach((el, idx) => { if(idx < desired) el.style.display = ''; else el.style.display = 'none'; });
+  existing = Array.from(arrowsGroup.querySelectorAll('.air')).filter(el => el.style.display !== 'none');
+  const amp = (vis.ampControl !== undefined) ? Number(vis.ampControl) : 0.8;
+  const ampMul = 0.5 + Math.max(0, Math.min(2, amp)) * 0.65;
+  existing.forEach((el, idx) => {
+    const base = vis.arrowScale || 1;
+    const scale = Math.max(0.25, Math.min(3.5, base * ampMul));
+    el.style.setProperty('--scale', String(scale));
+    el.style.transform = `scaleY(${scale}) translateX(0)`;
+    const freq = (vis.freqControl !== undefined) ? Number(vis.freqControl) : (vis.wobbleFreq || 1.0);
+    if(scale > 1.05 || amp > 0.2){
+      const dur = Math.max(0.35, 1.2 / Math.max(0.2, freq));
+      el.style.animation = `wobble ${dur}s infinite ease-in-out`;
+      el.style.strokeWidth = String(2 + 1.6 * (scale - 0.6));
+    } else {
+      el.style.animation = '';
+      el.style.strokeWidth = String(2 + 1.6 * (scale - 0.6));
+    }
+  });
+}
+
+/* Formatting */
+function formatResultsForDisplay(flow){
+  return `A1 = ${flow.A1.toExponential(3)} m²
+Q = ${flow.Q.toExponential(3)} m³/s
+A_int_single = ${flow.Aint_single.toExponential(3)} m²
+A_int_tot = ${flow.Aint_tot.toExponential(3)} m²
+V_int = ${flow.V_int.toFixed(3)} m/s
+V_avg_bottom = ${flow.V_avg_bottom.toFixed(4)} m/s`;
+}
+
+/* ---------- Owner-based tooltip logic with hysteresis and rAF positioning ---------- */
+
+let svgTip = document.getElementById('svgTip');
+let chartTip = document.getElementById('chartTip');
+
+function _clearOwnerListeners(el){
+  if(!el) return;
+  if(el._ownerLeave) {
+    try{ el.removeEventListener('pointerleave', el._ownerLeave); }catch(e){}
+    el._ownerLeave = null;
+  }
+  if(el._ownerMove) {
+    try{ el.removeEventListener('pointermove', el._ownerMove); }catch(e){}
+    el._ownerMove = null;
+  }
+}
+
+/* rAF positioning */
+let _posRaf = null;
+function _posNearEvent(el, e, margin = 12){
+  if(!el || !e) return;
+  if(_posRaf) cancelAnimationFrame(_posRaf);
+  _posRaf = requestAnimationFrame(() => {
+    const w = el.offsetWidth || 200;
+    const h = el.offsetHeight || 60;
+    let left = e.clientX + margin;
+    let top = e.clientY + margin;
+    if(left + w + 8 > window.innerWidth) left = e.clientX - w - margin;
+    if(top + h + 8 > window.innerHeight) top = e.clientY - h - margin;
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
+  });
+}
+
+/* Throttled elementFromPoint */
+let _lastEFPTs = 0;
+let _lastEFP = null;
+function _throttledElementFromPoint(x,y, minInterval = 16){
+  const now = performance.now();
+  if(now - _lastEFPTs < minInterval && _lastEFP) return _lastEFP;
+  _lastEFPTs = now;
+  _lastEFP = document.elementFromPoint(x,y);
+  return _lastEFP;
+}
+
+/* Scheduling state */
+const tooltipState = {
+  svg: { visible:false, owner:null, showTimer:null, hideTimer:null },
+  chart: { visible:false, owner:null, showTimer:null, hideTimer:null },
+  switchTimer: null
+};
+
+function _cancelTimer(obj, key){
+  if(obj && obj[key]){
+    clearTimeout(obj[key]);
+    obj[key] = null;
+  }
+}
+
+/* Schedule / show / hide functions use TIMINGS via getters */
+function scheduleShowSvg(html, ownerElement, initialEvent){
+  const HYST = getHysteresis();
+  const SHOW = getShowDelay();
+  if(tooltipState.chart.visible && tooltipState.chart.owner !== ownerElement){
+    if(tooltipState.switchTimer) clearTimeout(tooltipState.switchTimer);
+    tooltipState.switchTimer = setTimeout(() => {
+      scheduleHideChart(0);
+      scheduleShowSvg(html, ownerElement, initialEvent);
+      tooltipState.switchTimer = null;
+    }, HYST);
+    return;
+  }
+  _cancelTimer(tooltipState.svg, 'hideTimer');
+  _cancelTimer(tooltipState.svg, 'showTimer');
+  tooltipState.svg.showTimer = setTimeout(() => {
+    showSvgNow(html, ownerElement, initialEvent);
+    tooltipState.svg.showTimer = null;
+  }, SHOW);
+}
+
+function showSvgNow(html, ownerElement, initialEvent){
+  if(!svgTip) return;
+  if(tooltipState.chart.visible) scheduleHideChart(0);
+  svgTip.innerHTML = html;
+  svgTip.style.display = 'block';
+  svgTip.classList.add('show');
+  tooltipState.svg.visible = true;
+  if(tooltipState.svg.owner && tooltipState.svg.owner !== ownerElement){
+    _clearOwnerListeners(tooltipState.svg.owner);
+  }
+  tooltipState.svg.owner = ownerElement;
+  const onOwnerMove = (ev) => {
+    if(_isPointerOverChart(ev)){
+      scheduleHideSvg(getHideDelay());
+      return;
+    }
+    _posNearEvent(svgTip, ev);
+  };
+  const onOwnerLeave = (ev) => { scheduleHideSvg(getHideDelay()); };
+  if(ownerElement){
+    _clearOwnerListeners(ownerElement);
+    ownerElement._ownerMove = onOwnerMove;
+    ownerElement._ownerLeave = onOwnerLeave;
+    ownerElement.addEventListener('pointermove', onOwnerMove);
+    ownerElement.addEventListener('pointerleave', onOwnerLeave);
+  }
+  const docMove = (ev) => { if(_isPointerOverChart(ev)) scheduleHideSvg(0); };
+  svgTip._docMove = docMove;
+  document.addEventListener('pointermove', docMove);
+  if(initialEvent) _posNearEvent(svgTip, initialEvent);
+}
+
+function scheduleHideSvg(delay){
+  _cancelTimer(tooltipState.svg, 'showTimer');
+  _cancelTimer(tooltipState.svg, 'hideTimer');
+  tooltipState.svg.hideTimer = setTimeout(() => {
+    hideSvgNow();
+    tooltipState.svg.hideTimer = null;
+  }, Math.max(0, delay));
+}
+
+function hideSvgNow(){
+  if(!svgTip) return;
+  svgTip.classList.remove('show');
+  svgTip.style.display = 'none';
+  tooltipState.svg.visible = false;
+  if(tooltipState.svg.owner){
+    _clearOwnerListeners(tooltipState.svg.owner);
+    tooltipState.svg.owner = null;
+  }
+  if(svgTip._docMove){
+    try{ document.removeEventListener('pointermove', svgTip._docMove); }catch(e){}
+    svgTip._docMove = null;
+  }
+  _cancelTimer(tooltipState.svg, 'showTimer');
+  _cancelTimer(tooltipState.svg, 'hideTimer');
+}
+
+/* Chart scheduling */
+function scheduleShowChart(html, ownerElement, initialEvent){
+  const HYST = getHysteresis();
+  const SHOW = getShowDelay();
+  if(tooltipState.svg.visible && tooltipState.svg.owner !== ownerElement){
+    if(tooltipState.switchTimer) clearTimeout(tooltipState.switchTimer);
+    tooltipState.switchTimer = setTimeout(() => {
+      scheduleHideSvg(0);
+      scheduleShowChart(html, ownerElement, initialEvent);
+      tooltipState.switchTimer = null;
+    }, HYST);
+    return;
+  }
+  _cancelTimer(tooltipState.chart, 'hideTimer');
+  _cancelTimer(tooltipState.chart, 'showTimer');
+  tooltipState.chart.showTimer = setTimeout(() => {
+    showChartNow(html, ownerElement, initialEvent);
+    tooltipState.chart.showTimer = null;
+  }, SHOW);
+}
+
+function showChartNow(html, ownerElement, initialEvent){
+  if(!chartTip) return;
+  if(tooltipState.svg.visible) scheduleHideSvg(0);
+  chartTip.innerHTML = html;
+  chartTip.style.display = 'block';
+  tooltipState.chart.visible = true;
+  if(tooltipState.chart.owner && tooltipState.chart.owner !== ownerElement){
+    _clearOwnerListeners(tooltipState.chart.owner);
+  }
+  tooltipState.chart.owner = ownerElement;
+  const onOwnerMove = (ev) => { _posNearEvent(chartTip, ev); };
+  const onOwnerLeave = (ev) => { scheduleHideChart(getHideDelay()); };
+  if(ownerElement){
+    _clearOwnerListeners(ownerElement);
+    ownerElement._ownerMove = onOwnerMove;
+    ownerElement._ownerLeave = onOwnerLeave;
+    ownerElement.addEventListener('pointermove', onOwnerMove);
+    ownerElement.addEventListener('pointerleave', onOwnerLeave);
+  }
+  const docMove = (ev) => {
+    const el = _throttledElementFromPoint(ev.clientX, ev.clientY);
+    if(!el) return;
+    const canvas = el.closest && el.closest('canvas');
+    if(!(canvas && canvas.id === 'chartPexit')){
+      scheduleHideChart(0);
+    }
+  };
+  chartTip._docMove = docMove;
+  document.addEventListener('pointermove', docMove);
+  if(initialEvent) _posNearEvent(chartTip, initialEvent);
+}
+
+function scheduleHideChart(delay){
+  _cancelTimer(tooltipState.chart, 'showTimer');
+  _cancelTimer(tooltipState.chart, 'hideTimer');
+  tooltipState.chart.hideTimer = setTimeout(() => {
+    hideChartNow();
+    tooltipState.chart.hideTimer = null;
+  }, Math.max(0, delay));
+}
+
+function hideChartNow(){
+  if(!chartTip) return;
+  chartTip.style.display = 'none';
+  tooltipState.chart.visible = false;
+  if(tooltipState.chart.owner){
+    _clearOwnerListeners(tooltipState.chart.owner);
+    tooltipState.chart.owner = null;
+  }
+  if(chartTip._docMove){
+    try{ document.removeEventListener('pointermove', chartTip._docMove); }catch(e){}
+    chartTip._docMove = null;
+  }
+  _cancelTimer(tooltipState.chart, 'showTimer');
+  _cancelTimer(tooltipState.chart, 'hideTimer');
+}
+
+/* ---------- Chart.js loader, plugin and external tooltip (owner-aware) ---------- */
+function loadScriptOnce(src, cb){
+  if(document.querySelector('script[data-src="'+src+'"]')) return cb && cb();
+  const s = document.createElement('script'); s.src = src; s.async = true; s.setAttribute('data-src', src);
+  s.onload = () => cb && cb(); s.onerror = () => { console.error('Failed to load', src); cb && cb(new Error('load failed')); };
+  document.head.appendChild(s);
+}
+
+function ensureCanvasPixelSizeAndResize(){
+  const chart = window._aisChart;
+  if(!chart) return;
+  const canvas = chart.canvas;
+  const cssW = canvas.clientWidth; const cssH = canvas.clientHeight;
+  const dpr = window.devicePixelRatio || 1;
+  const targetW = Math.round(cssW * dpr); const targetH = Math.round(cssH * dpr);
+  if(canvas.width !== targetW || canvas.height !== targetH){
+    canvas.width = targetW; canvas.height = targetH;
+    try{ chart.resize(); } catch(e){ try{ chart.update(); }catch(e2){} }
+  } else {
+    try{ chart.update(); } catch(e){/*ignore*/ }
+  }
+}
+
+function initChart(){
+  if(typeof Chart === 'undefined'){
+    const cdn = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    loadScriptOnce(cdn, (err) => { if(err){ console.error('Chart.js failed to load'); return; } setTimeout(ensureCreateChart, 50); });
+  } else { ensureCreateChart(); }
+
+  function ensureCreateChart(){
+    let canvas = document.getElementById('chartPexit');
+    const container = document.querySelector('.controls');
+    if(!canvas && container){
+      canvas = document.createElement('canvas'); canvas.id = 'chartPexit'; canvas.style.width='100%'; canvas.style.height='320px'; canvas.style.marginTop='12px'; container.appendChild(canvas);
+    }
+    if(!canvas) { console.warn('Chart canvas not available'); return; }
+    if(typeof Chart === 'undefined'){ console.warn('Chart not available at create time'); return; }
+
+    if(window._aisChart && typeof window._aisChart.destroy === 'function'){ try{ window._aisChart.destroy(); }catch(e){} }
+
+    const ctx = canvas.getContext('2d');
+    const labels = Array.from({length:41}, (_,i) => +(i*0.05).toFixed(2));
+    const data = labels.map(()=>0);
+
+    const v0LinePluginObj = {
+      id: 'v0LinePlugin',
+      afterDraw: (chart) => {
+        const show = document.getElementById('showV0Line')?.value !== 'false';
+        if(!show) return;
+        const v0 = Number(params.V0);
+        if(Number.isNaN(v0)) return;
+        const xScale = chart.scales.x;
+        if(!xScale) return;
+        const min = xScale.min !== undefined ? xScale.min : Math.min(...chart.data.labels);
+        const max = xScale.max !== undefined ? xScale.max : Math.max(...chart.data.labels);
+        if(v0 < min || v0 > max){
+          chart.options.scales.x.min = Math.max(0, Math.min(min, v0) - 0.05);
+          chart.options.scales.x.max = Math.max(max, v0 + 0.05);
+          try{ chart.update('none'); }catch(e){}
+        }
+        const px = xScale.getPixelForValue(v0);
+        const ctx2 = chart.ctx;
+        ctx2.save();
+        ctx2.strokeStyle = document.getElementById('v0LineColor')?.value || '#1f4e79';
+        ctx2.lineWidth = 1.5;
+        ctx2.setLineDash([6,4]);
+        ctx2.beginPath();
+        ctx2.moveTo(px, chart.chartArea.top);
+        ctx2.lineTo(px, chart.chartArea.bottom);
+        ctx2.stroke();
+        ctx2.restore();
+        const label = `V0: ${v0.toFixed(2)} m/s`;
+        ctx2.save();
+        ctx2.fillStyle = (document.getElementById('v0LineColor')?.value) || '#1f4e79';
+        ctx2.font = '12px "Segoe UI", Arial';
+        const textW = ctx2.measureText(label).width + 12;
+        const boxX = Math.min(Math.max(px - textW/2, chart.chartArea.left + 6), chart.chartArea.right - textW - 6);
+        const boxY = chart.chartArea.top + 6;
+        ctx2.globalAlpha = 0.95;
+        ctx2.fillRect(boxX, boxY, textW, 20);
+        ctx2.fillStyle = '#fff';
+        ctx2.fillText(label, boxX + 6, boxY + 14);
+        ctx2.restore();
+      }
+    };
+    try { Chart.register(v0LinePluginObj); } catch(e){ console.warn('v0LinePlugin registration skipped or failed:', e && e.message ? e.message : e); }
+    window._aisChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [{ label:'P_{exit,b}', data, borderColor:'#f39c12', backgroundColor:'rgba(243,156,18,0.12)', borderWidth:2.5, pointRadius:0, tension:0.28, fill:true }] },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: {
+          legend:{ display:true, labels:{ color:'#34495e', font:{ size:12 } }, onClick: function(){ /* disable toggle */ return; } },
+          tooltip:{ enabled:true, external: (ctx)=>{/* will be set below */}, mode:'index', intersect:false }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            position: 'bottom',
+            min: 0,
+            max: 2,
+            title:{ display:true, text:'V (m/s)', color:'#34495e', font:{ size:13 } },
+            ticks:{ color:'#34495e', font:{ size:12 }, stepSize:0.05, callback: v => v.toFixed(2) },
+            grid:{ color:'rgba(31,78,121,0.06)', lineWidth:1 }, border:{ display:true, color:'rgba(31,78,121,0.12)' }
+          },
+          y:{ min:0, max:1, title:{ display:true, text:'P_{exit,b}', color:'#34495e', font:{ size:13 } }, ticks:{ color:'#34495e', font:{ size:12 }, stepSize:0.1, callback:(v)=>((document.getElementById('yFormat')?.value||'percent')==='percent' ? (v*100).toFixed(0)+'%' : v.toFixed(2)) }, grid:{ color:'rgba(31,78,121,0.06)', lineWidth:1 }, border:{ display:true, color:'rgba(31,78,121,0.12)' } }
+        },
+        layout:{ padding:{ top:6, right:6, bottom:6, left:6 } }
+      }
+    });
+
+    const externalTooltipHandler = (context) => {
+      const tooltip = context.tooltip;
+      if(!tooltip) return;
+      if(tooltip.opacity === 0){
+        scheduleHideChart(getHideDelay());
+        return;
+      }
+      try{ scheduleHideSvg(0); }catch(e){}
+      const dp = tooltip.dataPoints && tooltip.dataPoints[0];
+      const xVal = dp ? dp.parsed.x : '';
+      const yVal = dp ? dp.formattedValue : '';
+      const ka = parseFloat(document.getElementById('inp_ka')?.value) || defaults.ka;
+      const ff = parseFloat(document.getElementById('inp_ff')?.value) || defaults.f_focus;
+      const tstar = parseFloat(document.getElementById('inp_tstar')?.value) || defaults.t_star;
+      const alpha = parseFloat(document.getElementById('inp_alpha')?.value) || defaults.alpha;
+      const v0 = parseFloat(params.V0).toFixed(2);
+      const html = `<div style="font-weight:700;margin-bottom:6px;color:#fff;">V: ${xVal} m/s — P_exit: ${yVal}</div>
+        <div style="font-size:12px;color:#e6eef8;">Model: k_a=${ka}, f_focus=${ff}, t*=${tstar}, α=${alpha}</div>
+        <div style="font-size:12px;color:#e6eef8;margin-top:6px;">V0 (current): <strong>${v0} m/s</strong></div>`;
+      const owner = window._aisChart && window._aisChart.canvas ? window._aisChart.canvas : document.getElementById('chartPexit');
+      const canvasRect = owner.getBoundingClientRect();
+      let clientX = tooltip.caretX, clientY = tooltip.caretY;
+      if(typeof clientX === 'number' && typeof clientY === 'number'){
+        if(!(clientX >= canvasRect.left && clientX <= canvasRect.right && clientY >= canvasRect.top && clientY <= canvasRect.bottom)){
+          clientX = canvasRect.left + (canvasRect.width * 0.6);
+          clientY = canvasRect.top + (canvasRect.height * 0.2);
+        }
+      } else {
+        clientX = canvasRect.left + (canvasRect.width * 0.6);
+        clientY = canvasRect.top + (canvasRect.height * 0.2);
+      }
+      const ev = { clientX, clientY };
+      scheduleShowChart(html, owner, ev);
+    };
+
+    window._aisChart.options.plugins.tooltip.external = externalTooltipHandler;
+    window._aisChart.update();
+    setTimeout(()=>{ ensureCanvasPixelSizeAndResize(); }, 60);
+  }
+}
+
+/* update chart */
+function updateChartPexit(){
+  if(!window._aisChart) return;
+  const chart = window._aisChart;
+  const labels = chart.data.labels.map(l => parseFloat(l));
+  const ka = parseFloat(document.getElementById('inp_ka')?.value) || defaults.ka;
+  const f_focus = parseFloat(document.getElementById('inp_ff')?.value) || defaults.f_focus;
+  const r_eff = 0.005, s_b = 0.02;
+  chart.data.datasets[0].data = labels.map(V => {
+    const phi = (Math.PI * r_eff * r_eff / (s_b * s_b)) * f_focus * (V / Math.max(1e-6, params.V0));
+    return 1 - Math.exp(-ka * phi);
+  });
+
+  const yStep = parseFloat(document.getElementById('yStep')?.value) || 0.1;
+  const yFormat = document.getElementById('yFormat')?.value || 'percent';
+  chart.options.scales.y.ticks.stepSize = yStep;
+  chart.options.scales.y.ticks.callback = function(value){ if(yFormat === 'percent') return (value*100).toFixed(0) + '%'; return value.toFixed(2); };
+
+  chart.update();
+  setTimeout(()=>{ ensureCanvasPixelSizeAndResize(); }, 20);
+}
+
+/* bind controls */
+function bindControlsAIS(){
+  const inpV0 = document.getElementById('inpV0');
+  const inpD1 = document.getElementById('inpD1');
+  const inpDbase = document.getElementById('inpDbase');
+  const inpDint = document.getElementById('inpDint');
+  const inpNint = document.getElementById('inpNint');
+  const inpDbottom = document.getElementById('inpDbottom');
+  const inpNout = document.getElementById('inpNout');
+  const out = document.getElementById('calcOutput');
+  const valV0 = document.getElementById('valV0');
+
+  function readInputs(){
+    params.V0 = parseFloat(inpV0?.value) || defaults.V0;
+    params.D1 = parseFloat(inpD1?.value) || defaults.D1;
+    params.Dbase = parseFloat(inpDbase?.value) || defaults.Dbase;
+    params.Dint = parseFloat(inpDint?.value) || defaults.Dint;
+    params.Nint = parseInt(inpNint?.value,10) || defaults.Nint;
+    params.Dbottom = parseFloat(inpDbottom?.value) || defaults.Dbottom;
+    params.Nout = parseInt(inpNout?.value,10) || defaults.Nout;
+  }
+
+  function updateAll(){
+    readInputs();
+    if(valV0) valV0.textContent = params.V0.toFixed(2);
+    const flow = calcFlows(params);
+    window._lastAIS = { project:'AIS', flow, params:Object.assign({},params), ts:nowISO() };
+    if(out) out.textContent = formatResultsForDisplay(flow);
+
+    const ampControl = parseFloat(document.getElementById('inp_arrow_amp')?.value) || 0.8;
+    const freqControl = parseFloat(document.getElementById('inp_arrow_freq')?.value) || 1.0;
+    const countControl = parseInt(document.getElementById('inp_arrow_count')?.value,10) || 3;
+    const vis = mapVavgToVisual(flow.V_int, params.V0);
+    vis.ampControl = ampControl; vis.freqControl = freqControl; vis.count = countControl;
+    updateArrowsVisual(vis);
+
+    const geomCentral = { r_eff_b:0.005, s_b:0.02, t_dry_b:1.0 };
+    const prune = computePruningMetrics(flow, geomCentral, {
+      ka: parseFloat(document.getElementById('inp_ka')?.value) || defaults.ka,
+      f_focus: parseFloat(document.getElementById('inp_ff')?.value) || defaults.f_focus,
+      t_star: parseFloat(document.getElementById('inp_tstar')?.value) || defaults.t_star,
+      alpha: parseFloat(document.getElementById('inp_alpha')?.value) || defaults.alpha
+    });
+
+    if(out) out.textContent += `
+
+Pruning preview (central):
+phi_cap = ${prune.phi_cap.toFixed(4)}
+P_exit = ${prune.P_exit_b.toFixed(4)}
+Phi = ${prune.Phi.toFixed(4)}
+    `;
+
+    if(window._aisChart) updateChartPexit();
+  }
+
+  if(inpV0){
+    inpV0.addEventListener('input', function(e){
+      params.V0 = parseFloat(this.value) || defaults.V0;
+      document.getElementById('valV0').textContent = params.V0.toFixed(2);
+      const flow = calcFlows(params);
+      const ampControl = parseFloat(document.getElementById('inp_arrow_amp')?.value) || 0.8;
+      const freqControl = parseFloat(document.getElementById('inp_arrow_freq')?.value) || 1.0;
+      const countControl = parseInt(document.getElementById('inp_arrow_count')?.value,10) || 3;
+      const vis = mapVavgToVisual(flow.V_int, params.V0);
+      vis.ampControl = ampControl; vis.freqControl = freqControl; vis.count = countControl;
+      updateArrowsVisual(vis);
+      if(out) out.textContent = formatResultsForDisplay(flow);
+      if(window._aisChart) {
+        updateChartPexit();
+        ensureCanvasPixelSizeAndResize();
+      }
+    });
+  }
+
+  const inputs = [inpD1, inpDbase, inpDint, inpNint, inpDbottom, inpNout];
+  inputs.forEach(el => { if(el) el.addEventListener('input', updateAll); });
+
+  ['yFormat','yStep','showV0Line','v0LineColor'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', () => { const flow = calcFlows(params); const geomCentral = { r_eff_b:0.005, s_b:0.02, t_dry_b:1.0 }; const prune = computePruningMetrics(flow, geomCentral, { ka: parseFloat(document.getElementById('inp_ka')?.value)||defaults.ka, f_focus: parseFloat(document.getElementById('inp_ff')?.value)||defaults.f_focus, t_star: parseFloat(document.getElementById('inp_tstar')?.value)||defaults.t_star, alpha: parseFloat(document.getElementById('inp_alpha')?.value)||defaults.alpha }); if(window._aisChart) updateChartPexit(); });
+  });
+
+  const btnReset = document.getElementById('btnReset');
+  if(btnReset) btnReset.addEventListener('click', () => {
+    Object.keys(defaults).forEach(k => { if(k in params) params[k] = defaults[k]; });
+    if(inpV0) inpV0.value = defaults.V0; if(inpD1) inpD1.value = defaults.D1; if(inpDbase) inpDbase.value = defaults.Dbase;
+    if(inpDint) inpDint.value = defaults.Dint; if(inpNint) inpNint.value = defaults.Nint; if(inpDbottom) inpDbottom.value = defaults.Dbottom; if(inpNout) inpNout.value = defaults.Nout;
+    document.getElementById('inp_arrow_amp').value = 0.8; document.getElementById('inp_arrow_freq').value = 1.0; document.getElementById('inp_arrow_count').value = 3;
+    updateAll();
+  });
+
+  const btnCopy = document.getElementById('btnCopy');
+  if(btnCopy) btnCopy.addEventListener('click', () => {
+    const flow = calcFlows(params); const payload = { ts:nowISO(), params:Object.assign({},params), flow }; const text = JSON.stringify(payload, null, 2);
+    navigator.clipboard?.writeText(text).then(()=>{ const old = btnCopy.textContent; btnCopy.textContent='Copied'; setTimeout(()=>btnCopy.textContent=old,1200); }).catch(()=> alert('Copy not available. Use Export CSV.'));
+  });
+
+  const btnExport = document.getElementById('btnExport');
+  if(btnExport) btnExport.addEventListener('click', () => {
+    const flow = calcFlows(params);
+    const rows = [['param','value','unit'], ['V0', params.V0, 'm/s'], ['D1', params.D1, 'mm'], ['Dbase', params.Dbase, 'mm'], ['Dint', params.Dint, 'mm'], ['Nint', params.Nint, 'pcs'], ['Dbottom', params.Dbottom, 'mm'], ['Nout', params.Nout, 'pcs'], ['A1', flow.A1.toExponential(6), 'm^2'], ['Q', flow.Q.toExponential(6), 'm^3/s'], ['A_int_single', flow.Aint_single.toExponential(6), 'm^2'], ['A_int_tot', flow.Aint_tot.toExponential(6), 'm^2'], ['V_int', flow.V_int.toFixed(6), 'm/s'], ['V_avg_bottom', flow.V_avg_bottom.toFixed(6), 'm/s']];
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'ais_results.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
+  ['inp_arrow_amp','inp_arrow_freq','inp_arrow_count'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', () => {
+      const flow = calcFlows(params);
+      const ampControl = parseFloat(document.getElementById('inp_arrow_amp')?.value) || 0.8;
+      const freqControl = parseFloat(document.getElementById('inp_arrow_freq')?.value) || 1.0;
+      const countControl = parseInt(document.getElementById('inp_arrow_count')?.value,10) || 3;
+      const vis = mapVavgToVisual(flow.V_int, params.V0);
+      vis.ampControl = ampControl; vis.freqControl = freqControl; vis.count = countControl;
+      updateArrowsVisual(vis);
+    });
+  });
+
+  ['inp_ka','inp_ff','inp_tstar','inp_alpha'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', () => {
+      const flow = calcFlows(params);
+      const geomCentral = { r_eff_b:0.005, s_b:0.02, t_dry_b:1.0 };
+      const prune = computePruningMetrics(flow, geomCentral, { ka: parseFloat(document.getElementById('inp_ka')?.value)||defaults.ka, f_focus: parseFloat(document.getElementById('inp_ff')?.value)||defaults.f_focus, t_star: parseFloat(document.getElementById('inp_tstar')?.value)||defaults.t_star, alpha: parseFloat(document.getElementById('inp_alpha')?.value)||defaults.alpha });
+      if(window._aisChart) updateChartPexit(flow, prune);
+      const baseText = formatResultsForDisplay(flow); const outEl = document.getElementById('calcOutput'); if(outEl) outEl.textContent = baseText + `
+
+Pruning preview (central):
+phi_cap = ${prune.phi_cap.toFixed(4)}
+P_exit = ${prune.P_exit_b.toFixed(4)}
+Phi = ${prune.Phi.toFixed(4)}
+      `;
+    });
+  });
+
+  updateAll();
+}
+
+/* SVG interactions and arrow handlers (owner-aware) */
+function initZoneInteractions(){
+  const svg = document.getElementById('diagram'); if(!svg) return;
+  const radii = { central:30, transition:60, peripheral:90 };
+  const modes = { central:{scale:0.75,wobble:false,formula:'formula-central'}, transition:{scale:1.0,wobble:false,formula:'formula-transition'}, peripheral:{scale:1.35,wobble:true,formula:'formula-peripheral'} };
+
+  function getDistanceFromCenter(evt){
+    const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+    const ctm = svg.getScreenCTM().inverse(); const loc = pt.matrixTransform(ctm);
+    const dx = loc.x - 150, dy = loc.y - 150; return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  function showFormula(id){ document.querySelectorAll('.formula-block').forEach(div => div.classList.remove('show')); const block = document.getElementById(id); if(block){ block.classList.add('show'); if(window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([block]).catch(()=>{}); } }
+
+  svg.addEventListener('click', (evt) => {
+    const r = getDistanceFromCenter(evt); let chosen = null;
+    if(r <= radii.central) chosen = 'central'; else if(r <= radii.transition) chosen = 'transition'; else if(r <= radii.peripheral) chosen = 'peripheral';
+    if(chosen){ const mode = modes[chosen]; const vis = { arrowScale: mode.scale, wobbleAmp: mode.wobble ? 0.8 : 0.1, wobbleFreq: mode.wobble ? 1.2 : 0.9, count: parseInt(document.getElementById('inp_arrow_count')?.value,10) || 3 }; updateArrowsVisual(vis); showFormula(mode.formula); }
+  });
+
+  svg.addEventListener('mousemove', (evt) => {
+    const r = getDistanceFromCenter(evt); document.querySelectorAll('circle.zone').forEach(c => { c.setAttribute('stroke','var(--accent)'); c.setAttribute('stroke-width','1.5'); });
+    if(r <= radii.central) { document.getElementById('zone-central')?.setAttribute('stroke','#000'); document.getElementById('zone-central')?.setAttribute('stroke-width','2.5'); }
+    else if(r <= radii.transition) { document.getElementById('zone-transition')?.setAttribute('stroke','#000'); document.getElementById('zone-transition')?.setAttribute('stroke-width','2.5'); }
+    else if(r <= radii.peripheral) { document.getElementById('zone-peripheral')?.setAttribute('stroke','#000'); document.getElementById('zone-peripheral')?.setAttribute('stroke-width','2.5'); }
+  });
+
+  svg.addEventListener('mouseleave', () => { document.querySelectorAll('circle.zone').forEach(c => { c.setAttribute('stroke','var(--accent)'); c.setAttribute('stroke-width','1.5'); }); scheduleHideSvg(getHideDelay()); });
+}
+
+function attachSvgArrowHandlers(){
+  const arrows = Array.from(document.querySelectorAll('#diagram .air'));
+  arrows.forEach(a => {
+    a.onmouseenter = null;
+    a.onmouseleave = null;
+    a.onpointerenter = null;
+    a.onpointerleave = null;
+
+    a.addEventListener('pointerenter', (e) => {
+      try{ scheduleHideChart(0); }catch(err){}
+      try{
+        const flow = calcFlows(params);
+        const html = `<div style="font-weight:700;color:#fff;margin-bottom:6px;">Airflow</div>
+          <div style="font-size:13px;color:#e6eef8;"><strong>V_int</strong>: ${flow.V_int.toFixed(3)} m/s<br><strong>V_avg_bottom</strong>: ${flow.V_avg_bottom.toFixed(4)} m/s<br><strong>Q</strong>: ${flow.Q.toExponential(3)} m³/s</div>`;
+        scheduleShowSvg(html, a, e);
+      }catch(err){
+        scheduleShowSvg('—', a, e);
+      }
+    });
+
+    a.addEventListener('pointerleave', (e) => { scheduleHideSvg(getHideDelay()); });
+  });
+}
+
+/* Safe recreate after 200ms on load */
+document.addEventListener('DOMContentLoaded', () => {
+  applyTimingsToUI();
+
+  document.getElementById('tim_save')?.addEventListener('click', () => {
+    updateTimingsFromUI();
+    applyTimingsToUI();
+    const btn = document.getElementById('tim_save');
+    const old = btn.textContent;
+    btn.textContent = 'Saved';
+    setTimeout(()=>btn.textContent = old, 900);
+  });
+  document.getElementById('tim_reset')?.addEventListener('click', () => {
+    TIMINGS = { hysteresis:80, show:50, hide:20 };
+    saveTimings(TIMINGS);
+    applyTimingsToUI();
+    const btn = document.getElementById('tim_reset');
+    const old = btn.textContent;
+    btn.textContent = 'Reset';
+    setTimeout(()=>btn.textContent = old, 900);
+  });
+
+  initChart();
+  bindControlsAIS();
+  initZoneInteractions();
+  attachSvgArrowHandlers();
+
+  setTimeout(() => {
+    try {
+      if(!window._aisChart) {
+        initChart();
+      }
+      const flow = calcFlows(params);
+      const prune = computePruningMetrics(flow, { r_eff_b:0.005, s_b:0.02, t_dry_b:1.0 }, {
+        ka: parseFloat(document.getElementById('inp_ka')?.value) || defaults.ka,
+        f_focus: parseFloat(document.getElementById('inp_ff')?.value) || defaults.f_focus,
+        t_star: parseFloat(document.getElementById('inp_tstar')?.value) || defaults.t_star,
+        alpha: parseFloat(document.getElementById('inp_alpha')?.value) || defaults.alpha
+      });
+      if(window._aisChart) {
+        updateChartPexit(flow, prune);
+        ensureCanvasPixelSizeAndResize();
+      } else {
+        setTimeout(() => { try { const flow2 = calcFlows(params); const prune2 = computePruningMetrics(flow2, { r_eff_b:0.005, s_b:0.02, t_dry_b:1.0 }); updateChartPexit(flow2, prune2); ensureCanvasPixelSizeAndResize(); } catch(e){} }, 140);
+      }
+    } catch(e) {
+      console.warn('Safe recreate failed:', e && e.message ? e.message : e);
+    }
+  }, 200);
+});
+</script>
+</body>
+</html>
